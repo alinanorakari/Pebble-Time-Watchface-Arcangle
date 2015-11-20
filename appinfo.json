@@ -1,0 +1,22 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "lastfuture@lastfuture.de",
+    "longName": "Arcangle",
+    "projectType": "native",
+    "resources": {
+        "media": []
+    },
+    "sdkVersion": "3",
+    "shortName": "Arcangle",
+    "targetPlatforms": [
+        "chalk"
+    ],
+    "uuid": "000fd62a-3f0a-4bdd-a118-b3caa48893a0",
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
