@@ -1,7 +1,9 @@
 {
-    "appKeys": {},
+    "appKeys": {
+        "colors": 0
+    },
     "capabilities": [
-        ""
+        "configurable"
     ],
     "companyName": "lastfuture@lastfuture.de",
     "longName": "Arcangle",

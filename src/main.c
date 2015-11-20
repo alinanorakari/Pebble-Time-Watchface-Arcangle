@@ -1,6 +1,8 @@
 #include <pebble.h>
 
-#define ANTIALIASING true
+#define KEY_COLORS         0
+
+#define ANTIALIASING       true
 
 #define FINAL_RADIUS       88
 #define HAND_WIDTH         6
@@ -23,11 +25,51 @@ static Layer *s_canvas_layer;
 
 static GPoint s_center;
 static Time s_last_time;
-static int s_radius = 0;
+static int s_radius = 0, colors = 1;
 static bool s_animating = false, debug = false;
 static float anim_offset;
 
 static GColor gcolorbg, gcolorh, gcolort;
+
+static void handle_colorchange() {
+  switch(colors) {
+    case 1: // greens
+      gcolorh = GColorMediumSpringGreen;
+      gcolort = GColorMidnightGreen;
+      break;
+    
+    case 3: // blues
+      gcolorh = GColorBlueMoon;
+      gcolort = GColorOxfordBlue;
+      break;
+    
+    case 2: // reds
+      gcolorh = GColorRed;
+      gcolort = GColorBulgarianRose;
+      break;
+    
+    case 4: // greys
+      gcolorh = GColorWhite;
+      gcolort = GColorDarkGray;
+      break;
+    
+    default:
+      break;
+  }
+}
+
+static void inbox_received_handler(DictionaryIterator *iter, void *context) {
+  Tuple *colors_t = dict_find(iter, KEY_COLORS);
+    
+  if(colors_t) {
+    colors = colors_t->value->uint8;
+    persist_write_int(KEY_COLORS, colors);
+    handle_colorchange();
+  }
+  if(s_canvas_layer) {
+    layer_mark_dirty(s_canvas_layer);
+  }
+}
 
 /*************************** AnimationImplementation **************************/
 
@@ -172,6 +214,14 @@ static void window_load(Window *window) {
 
   s_center = grect_center_point(&window_bounds);
   
+  if (persist_exists(KEY_COLORS)) {
+    colors = persist_read_int(KEY_COLORS);
+  } else {
+    colors = 1;
+  }
+
+
+  
   s_canvas_layer = layer_create(window_bounds);
   layer_set_update_proc(s_canvas_layer, update_proc);
   layer_add_child(window_layer, s_canvas_layer);
@@ -215,21 +265,10 @@ static void init() {
   window_stack_push(s_main_window, true);
   
   gcolorbg = GColorBlack;
-  // greens
   gcolorh = GColorMediumSpringGreen;
   gcolort = GColorMidnightGreen;
-  
-  // blues
-  //gcolorh = GColorPictonBlue;
-  //gcolort = GColorCobaltBlue;
-  
-  // reds
-  //gcolorh = GColorRed;
-  //gcolort = GColorDarkCandyAppleRed;
-  
-  // greys
-  //gcolorh = GColorWhite;
-  //gcolort = GColorDarkGray;
+
+  handle_colorchange();
   
   if (debug) {
     tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
@@ -240,6 +279,11 @@ static void init() {
   if (debug) {
     light_enable(true);
   }
+  
+  app_message_register_inbox_received(inbox_received_handler);
+  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+
+
 
   // Prepare animations
   AnimationImplementation radius_impl = {

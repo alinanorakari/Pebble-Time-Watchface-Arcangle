@@ -3,7 +3,7 @@ Pebble.addEventListener('ready', function() {
 });
 
 Pebble.addEventListener('showConfiguration', function() {
-    var url='http://pebble.lastfuture.de/config/supersimple13/';
+    var url='http://pebble.lastfuture.de/config/arcangle10/';
     console.log('Showing configuration page: '+url);
     Pebble.openURL(url);
 });
