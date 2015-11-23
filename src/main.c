@@ -4,12 +4,11 @@
 
 #define ANTIALIASING       true
 
-#define FINAL_RADIUS       88
+#define FINAL_RADIUS       90
 #define HAND_WIDTH         6
-#define TICK_RADIUS        3
-#define HAND_MARGIN_OUTER  16
-#define HAND_MARGIN_INNER  50
-#define SHADOW_OFFSET      2
+#define HAND_MARGIN_OUTER  15
+#define HAND_MARGIN_MIDDLE 32
+#define HAND_MARGIN_INNER  40
 #define GRID_SPACING       18
 
 #define ANIMATION_DURATION 400
@@ -27,7 +26,6 @@ static GPoint s_center;
 static Time s_last_time;
 static int s_radius = 0, colors = 1;
 static bool s_animating = false, debug = false;
-static float anim_offset;
 
 static GColor gcolorbg, gcolorh, gcolort;
 
@@ -102,7 +100,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   // Store time
   // dummy time in emulator
   if (debug) {
-    s_last_time.hours = 8;
+    s_last_time.hours = 5;
     s_last_time.minutes = tick_time->tm_sec;
   } else {
     s_last_time.hours = tick_time->tm_hour;
@@ -128,6 +126,11 @@ static int32_t get_angle_for_hour(int hour, int minute) {
 
 static void update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
+  GRect bounds_mo = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_OUTER));
+  GRect bounds_mi = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_MIDDLE-1));
+  GRect bounds_m = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_MIDDLE));
+  GRect bounds_ho = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_MIDDLE+1));
+  GRect bounds_hi = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_INNER));
   graphics_context_set_fill_color(ctx, gcolorbg);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_antialiased(ctx, ANTIALIASING);
@@ -136,32 +139,13 @@ static void update_proc(Layer *layer, GContext *ctx) {
   Time mode_time = s_last_time;
 
   // Adjust for minutes through the hour
-  float hour_angle = TRIG_MAX_ANGLE * mode_time.hours / 12;
-  float minute_angle = TRIG_MAX_ANGLE * mode_time.minutes / 60;
   float hour_deg = get_angle_for_hour(mode_time.hours, mode_time.minutes);
   float minute_deg = get_angle_for_minute(mode_time.minutes);
-  hour_angle += (minute_angle / TRIG_MAX_ANGLE) * (TRIG_MAX_ANGLE / 12);
-  if (s_animating) {
-	  hour_angle += anim_offset;
-	  minute_angle -= anim_offset;
-  }
 
-  GPoint minute_hand_outer = (GPoint) {
-    .x = (int16_t)(sin_lookup(TRIG_MAX_ANGLE * mode_time.minutes / 60) * (int32_t)(s_radius - HAND_MARGIN_OUTER) / TRIG_MAX_RATIO) + s_center.x,
-    .y = (int16_t)(-cos_lookup(TRIG_MAX_ANGLE * mode_time.minutes / 60) * (int32_t)(s_radius - HAND_MARGIN_OUTER) / TRIG_MAX_RATIO) + s_center.y,
-  };
-  GPoint minute_hand_inner = (GPoint) {
-    .x = (int16_t)(sin_lookup(TRIG_MAX_ANGLE * mode_time.minutes / 60) * ((int32_t)HAND_MARGIN_INNER+1) / TRIG_MAX_RATIO) + s_center.x,
-    .y = (int16_t)(-cos_lookup(TRIG_MAX_ANGLE * mode_time.minutes / 60) * ((int32_t)HAND_MARGIN_INNER+1) / TRIG_MAX_RATIO) + s_center.y,
-  };
-  GPoint hour_hand_outer = (GPoint) {
-    .x = (int16_t)(sin_lookup(hour_angle) * (int32_t)(s_radius - HAND_MARGIN_OUTER - (0.35 * s_radius)) / TRIG_MAX_RATIO) + s_center.x,
-    .y = (int16_t)(-cos_lookup(hour_angle) * (int32_t)(s_radius - HAND_MARGIN_OUTER - (0.35 * s_radius)) / TRIG_MAX_RATIO) + s_center.y,
-  };
-  GPoint hour_hand_inner = (GPoint) {
-    .x = (int16_t)(sin_lookup(hour_angle) * (int32_t)HAND_MARGIN_INNER / TRIG_MAX_RATIO) + s_center.x,
-    .y = (int16_t)(-cos_lookup(hour_angle) * (int32_t)HAND_MARGIN_INNER / TRIG_MAX_RATIO) + s_center.y,
-  };
+  GPoint minute_hand_outer = gpoint_from_polar(bounds_mo, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(minute_deg));
+  GPoint minute_hand_inner = gpoint_from_polar(bounds_mi, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(minute_deg));
+  GPoint hour_hand_outer = gpoint_from_polar(bounds_ho, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(hour_deg));
+  GPoint hour_hand_inner = gpoint_from_polar(bounds_hi, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(hour_deg));
   
   graphics_context_set_stroke_color(ctx, gcolort);
   graphics_context_set_stroke_width(ctx, 1);
@@ -177,33 +161,29 @@ static void update_proc(Layer *layer, GContext *ctx) {
     graphics_draw_line(ctx, gxtop, gxbot);
   }
 
-
+  
+  graphics_context_set_stroke_color(ctx, gcolorh);
+  graphics_context_set_stroke_width(ctx, HAND_WIDTH);
   if((s_radius - HAND_MARGIN_OUTER) > HAND_MARGIN_INNER) {
     if(s_radius > 2 * HAND_MARGIN_OUTER) {
-      graphics_context_set_stroke_color(ctx, gcolorh);
-      graphics_context_set_stroke_width(ctx, HAND_WIDTH);
       graphics_draw_line(ctx, hour_hand_inner, hour_hand_outer);
     }
     if(s_radius > HAND_MARGIN_OUTER) {
-      graphics_context_set_stroke_color(ctx, gcolorh);
-      graphics_context_set_stroke_width(ctx, HAND_WIDTH);
       graphics_draw_line(ctx, minute_hand_inner, minute_hand_outer);
     }
-    GRect frame = grect_inset(bounds, GEdgeInsets(37));
-    graphics_context_set_fill_color(ctx, gcolorh);
     if (minute_deg > hour_deg && minute_deg-hour_deg > 180) {
       hour_deg += 360;
     } else if (minute_deg < hour_deg && hour_deg-minute_deg > 180) {
       minute_deg += 360;
     }
     if (minute_deg < hour_deg) {
-      graphics_fill_radial(ctx, frame, GOvalScaleModeFitCircle, HAND_WIDTH,
-                           DEG_TO_TRIGANGLE(minute_deg-1),
-                           DEG_TO_TRIGANGLE(hour_deg+1));
+      graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
+                           DEG_TO_TRIGANGLE(minute_deg),
+                           DEG_TO_TRIGANGLE(hour_deg));
     } else {
-      graphics_fill_radial(ctx, frame, GOvalScaleModeFitCircle, HAND_WIDTH,
-                           DEG_TO_TRIGANGLE(hour_deg-1),
-                           DEG_TO_TRIGANGLE(minute_deg+1));
+      graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
+                           DEG_TO_TRIGANGLE(hour_deg),
+                           DEG_TO_TRIGANGLE(minute_deg));
     }
   }
 }
