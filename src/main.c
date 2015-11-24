@@ -1,7 +1,7 @@
 #include <pebble.h>
 
 #define KEY_COLORS         0
-#define KEY_INVERSE        0
+#define KEY_INVERSE        1
 
 #define ANTIALIASING       true
 #define INVERSE            true
@@ -81,6 +81,11 @@ static void handle_colorchange() {
         break;
     }
   }
+  if (inverse) {
+    gcolorbg = GColorWhite;
+  } else {
+    gcolorbg = GColorBlack;
+  }
 }
 
 static void inbox_received_handler(DictionaryIterator *iter, void *context) {
@@ -90,7 +95,6 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if(colors_t) {
     colors = colors_t->value->uint8;
     persist_write_int(KEY_COLORS, colors);
-    handle_colorchange();
   }
   if(inverse_t && inverse_t->value->int32 > 0) {
     persist_write_bool(KEY_INVERSE, true);
@@ -99,6 +103,7 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
     persist_write_bool(KEY_INVERSE, false);
     inverse = false;
   }
+  handle_colorchange();
   if(s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
   }
