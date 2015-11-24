@@ -1,8 +1,10 @@
 #include <pebble.h>
 
 #define KEY_COLORS         0
+#define KEY_INVERSE        0
 
 #define ANTIALIASING       true
+#define INVERSE            true
 
 #define FINAL_RADIUS       90
 #define HAND_WIDTH         6
@@ -24,8 +26,8 @@ static Layer *s_canvas_layer;
 
 static GPoint s_center;
 static Time s_last_time;
-static int s_radius = 0, colors = 1;
-static bool s_animating = false, debug = false;
+static int colors = 1;
+static bool s_animating = false, debug = false, inverse = false;
 
 static GColor gcolorbg, gcolorh, gcolort;
 
@@ -54,15 +56,48 @@ static void handle_colorchange() {
     default:
       break;
   }
+  if (inverse) {
+    GColor tempcolor = gcolorh;
+    gcolorh = gcolort;
+    gcolort = tempcolor;
+    switch(colors) {
+      case 1: // greens
+        gcolorh = GColorDarkGreen;
+        gcolort = GColorMediumAquamarine;
+        break;
+      
+      case 3: // blues
+        gcolort = GColorPictonBlue;
+        break;
+      
+      case 2: // reds
+        gcolort = GColorMelon;
+        break;
+      
+      case 4: // greys
+        gcolort = GColorLightGray;
+        break; 
+      default:
+        break;
+    }
+  }
 }
 
 static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   Tuple *colors_t = dict_find(iter, KEY_COLORS);
+  Tuple *inverse_t = dict_find(iter, KEY_INVERSE);
     
   if(colors_t) {
     colors = colors_t->value->uint8;
     persist_write_int(KEY_COLORS, colors);
     handle_colorchange();
+  }
+  if(inverse_t && inverse_t->value->int32 > 0) {
+    persist_write_bool(KEY_INVERSE, true);
+    inverse = true;
+  } else {
+    persist_write_bool(KEY_INVERSE, false);
+    inverse = false;
   }
   if(s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
@@ -164,27 +199,22 @@ static void update_proc(Layer *layer, GContext *ctx) {
   
   graphics_context_set_stroke_color(ctx, gcolorh);
   graphics_context_set_stroke_width(ctx, HAND_WIDTH);
-  if((s_radius - HAND_MARGIN_OUTER) > HAND_MARGIN_INNER) {
-    if(s_radius > 2 * HAND_MARGIN_OUTER) {
-      graphics_draw_line(ctx, hour_hand_inner, hour_hand_outer);
-    }
-    if(s_radius > HAND_MARGIN_OUTER) {
-      graphics_draw_line(ctx, minute_hand_inner, minute_hand_outer);
-    }
-    if (minute_deg > hour_deg && minute_deg-hour_deg > 180) {
-      hour_deg += 360;
-    } else if (minute_deg < hour_deg && hour_deg-minute_deg > 180) {
-      minute_deg += 360;
-    }
-    if (minute_deg < hour_deg) {
-      graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
-                           DEG_TO_TRIGANGLE(minute_deg),
-                           DEG_TO_TRIGANGLE(hour_deg));
-    } else {
-      graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
-                           DEG_TO_TRIGANGLE(hour_deg),
-                           DEG_TO_TRIGANGLE(minute_deg));
-    }
+  graphics_draw_line(ctx, hour_hand_inner, hour_hand_outer);
+  graphics_draw_line(ctx, minute_hand_inner, minute_hand_outer);
+  if (minute_deg > hour_deg && minute_deg-hour_deg > 180) {
+    hour_deg += 360;
+  } else if (minute_deg < hour_deg && hour_deg-minute_deg > 180) {
+    minute_deg += 360;
+  }
+  graphics_context_set_stroke_width(ctx, HAND_WIDTH+1);
+  if (minute_deg < hour_deg) {
+    graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
+                      DEG_TO_TRIGANGLE(minute_deg),
+                      DEG_TO_TRIGANGLE(hour_deg));
+  } else {
+    graphics_draw_arc(ctx, bounds_m, GOvalScaleModeFitCircle,
+                      DEG_TO_TRIGANGLE(hour_deg),
+                      DEG_TO_TRIGANGLE(minute_deg));
   }
 }
 
@@ -193,13 +223,19 @@ static void window_load(Window *window) {
   GRect window_bounds = layer_get_bounds(window_layer);
 
   s_center = grect_center_point(&window_bounds);
+  s_center.x -= 1;
+  s_center.y -= 1;
   
   if (persist_exists(KEY_COLORS)) {
     colors = persist_read_int(KEY_COLORS);
   } else {
     colors = 1;
   }
-
+  if (persist_exists(KEY_INVERSE)) {
+    inverse = persist_read_bool(KEY_INVERSE);
+  } else {
+    inverse = false;
+  }
 
   
   s_canvas_layer = layer_create(window_bounds);
@@ -212,15 +248,6 @@ static void window_unload(Window *window) {
 }
 
 /*********************************** App **************************************/
-
-static int anim_percentage(AnimationProgress dist_normalized, int max) {
-  return (int)(float)(((float)dist_normalized / (float)ANIMATION_NORMALIZED_MAX) * (float)max);
-}
-
-static void radius_update(Animation *anim, AnimationProgress dist_normalized) {
-  s_radius = anim_percentage(dist_normalized, FINAL_RADIUS);
-  layer_mark_dirty(s_canvas_layer);
-}
 
 static void init() {
   srand(time(NULL));
@@ -244,7 +271,12 @@ static void init() {
   });
   window_stack_push(s_main_window, true);
   
-  gcolorbg = GColorBlack;
+  if (inverse) {
+    gcolorbg = GColorWhite;
+  } else {
+    gcolorbg = GColorBlack;
+  }
+  
   gcolorh = GColorMediumSpringGreen;
   gcolort = GColorMidnightGreen;
 
@@ -262,14 +294,6 @@ static void init() {
   
   app_message_register_inbox_received(inbox_received_handler);
   app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
-
-
-
-  // Prepare animations
-  AnimationImplementation radius_impl = {
-    .update = radius_update
-  };
-  animate(ANIMATION_DURATION, ANIMATION_DELAY, &radius_impl, false);
 }
 
 static void deinit() {
