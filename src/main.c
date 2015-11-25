@@ -255,6 +255,7 @@ static void window_load(Window *window) {
 }
 
 static void window_unload(Window *window) {
+  layer_destroy(bg_canvas_layer);
   layer_destroy(s_canvas_layer);
 }
 
