@@ -3,7 +3,7 @@ Pebble.addEventListener('ready', function() {
 });
 
 Pebble.addEventListener('showConfiguration', function() {
-    var url='http://pebble.lastfuture.de/config/arcangle11/';
+    var url='http://pebble.lastfuture.de/config/arcangle13/';
     console.log('Showing configuration page: '+url);
     Pebble.openURL(url);
 });
@@ -14,7 +14,8 @@ Pebble.addEventListener('webviewclosed', function(e) {
     if (configData.colors) {
         Pebble.sendAppMessage({
             colors: configData.colors,
-            inverse: 0+(configData.inverse === true)
+            inverse: 0+(configData.inverse === true),
+            btvibe: 0+(configData.btvibe === true)
         }, function() {
             console.log('Send successful!');
         }, function() {

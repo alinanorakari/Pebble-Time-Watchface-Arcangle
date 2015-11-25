@@ -1,5 +1,6 @@
 {
     "appKeys": {
+        "btvibe": 2,
         "colors": 0,
         "inverse": 1
     },
@@ -18,7 +19,7 @@
         "chalk"
     ],
     "uuid": "000fd62a-3f0a-4bdd-a118-b3caa48893a0",
-    "versionLabel": "1.2",
+    "versionLabel": "1.3",
     "watchapp": {
         "watchface": true
     }

@@ -2,6 +2,7 @@
 
 #define KEY_COLORS         0
 #define KEY_INVERSE        1
+#define KEY_BT_VIBE        2
 
 #define ANTIALIASING       true
 #define INVERSE            true
@@ -27,7 +28,7 @@ static Layer *bg_canvas_layer, *s_canvas_layer;
 static GPoint s_center;
 static Time s_last_time;
 static int colors = 1;
-static bool s_animating = false, debug = false, inverse = false;
+static bool s_animating = false, debug = false, inverse = false, btvibe = false;
 
 static GColor gcolorbg, gcolorh, gcolort;
 
@@ -91,6 +92,7 @@ static void handle_colorchange() {
 static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   Tuple *colors_t = dict_find(iter, KEY_COLORS);
   Tuple *inverse_t = dict_find(iter, KEY_INVERSE);
+  Tuple *btvibe_t = dict_find(iter, KEY_BT_VIBE);
     
   if(colors_t) {
     colors = colors_t->value->uint8;
@@ -103,6 +105,13 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
     persist_write_bool(KEY_INVERSE, false);
     inverse = false;
   }
+  if(btvibe_t && btvibe_t->value->int8 > 0) {
+    persist_write_bool(KEY_BT_VIBE, true);
+    btvibe = true;
+  } else {
+    persist_write_bool(KEY_BT_VIBE, false);
+    btvibe = false;
+  }
   handle_colorchange();
   if(bg_canvas_layer) {
     layer_mark_dirty(bg_canvas_layer);
@@ -110,6 +119,7 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if(s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
   }
+  vibes_short_pulse();
 }
 
 /*************************** AnimationImplementation **************************/
@@ -154,6 +164,17 @@ static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   // Redraw
   if(s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
+  }
+}
+
+static void handle_bluetooth(bool connected) {
+  if (btvibe && !connected) {
+    static uint32_t const segments[] = { 200, 200, 50, 150, 200 };
+    VibePattern pat = {
+    	.durations = segments,
+    	.num_segments = ARRAY_LENGTH(segments),
+    };
+    vibes_enqueue_custom_pattern(pat);
   }
 }
 
@@ -245,6 +266,11 @@ static void window_load(Window *window) {
   } else {
     inverse = false;
   }
+  if (persist_exists(KEY_BT_VIBE)) {
+    btvibe = persist_read_bool(KEY_BT_VIBE);
+  } else {
+    btvibe = false;
+  }
 
   bg_canvas_layer = layer_create(window_bounds);
   s_canvas_layer = layer_create(window_bounds);
@@ -303,6 +329,12 @@ static void init() {
   if (debug) {
     light_enable(true);
   }
+  
+  handle_bluetooth(connection_service_peek_pebble_app_connection());
+  
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = handle_bluetooth
+  });
   
   app_message_register_inbox_received(inbox_received_handler);
   app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
