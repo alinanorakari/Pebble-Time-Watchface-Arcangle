@@ -22,7 +22,7 @@ typedef struct {
 } Time;
 
 static Window *s_main_window;
-static Layer *s_canvas_layer;
+static Layer *bg_canvas_layer, *s_canvas_layer;
 
 static GPoint s_center;
 static Time s_last_time;
@@ -104,6 +104,9 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
     inverse = false;
   }
   handle_colorchange();
+  if(bg_canvas_layer) {
+    layer_mark_dirty(bg_canvas_layer);
+  }
   if(s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
   }
@@ -164,6 +167,25 @@ static int32_t get_angle_for_hour(int hour, int minute) {
   return ((hour * 360) / 12)+(get_angle_for_minute(minute)/12);
 }
 
+static void bg_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_fill_color(ctx, gcolorbg);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  graphics_context_set_antialiased(ctx, ANTIALIASING);
+  graphics_context_set_stroke_color(ctx, gcolort);
+  graphics_context_set_stroke_width(ctx, 1);
+  for (int gx=0; gx<bounds.size.h; gx += GRID_SPACING) {
+    GPoint gxtop = (GPoint) { .x = gx, .y = 0 };
+    GPoint gxbot = (GPoint) { .x = gx, .y = bounds.size.h };
+    graphics_draw_line(ctx, gxtop, gxbot);
+  }
+  for (int gy=0; gy<bounds.size.w; gy += GRID_SPACING) {
+    GPoint gxtop = (GPoint) { .y = gy, .x = 0 };
+    GPoint gxbot = (GPoint) { .y = gy, .x = bounds.size.w };
+    graphics_draw_line(ctx, gxtop, gxbot);
+  }
+}
+
 static void update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GRect bounds_mo = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_OUTER));
@@ -171,9 +193,6 @@ static void update_proc(Layer *layer, GContext *ctx) {
   GRect bounds_m = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_MIDDLE));
   GRect bounds_ho = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_MIDDLE+1));
   GRect bounds_hi = grect_inset(bounds, GEdgeInsets(HAND_MARGIN_INNER));
-  graphics_context_set_fill_color(ctx, gcolorbg);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_antialiased(ctx, ANTIALIASING);
 
   // Use current time while animating
   Time mode_time = s_last_time;
@@ -186,21 +205,6 @@ static void update_proc(Layer *layer, GContext *ctx) {
   GPoint minute_hand_inner = gpoint_from_polar(bounds_mi, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(minute_deg));
   GPoint hour_hand_outer = gpoint_from_polar(bounds_ho, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(hour_deg));
   GPoint hour_hand_inner = gpoint_from_polar(bounds_hi, GOvalScaleModeFitCircle, DEG_TO_TRIGANGLE(hour_deg));
-  
-  graphics_context_set_stroke_color(ctx, gcolort);
-  graphics_context_set_stroke_width(ctx, 1);
-  for (int gx=0; gx<bounds.size.h; gx += GRID_SPACING) {
-    GPoint gxtop = (GPoint) { .x = gx, .y = 0 };
-    GPoint gxbot = (GPoint) { .x = gx, .y = bounds.size.h };
-    graphics_draw_line(ctx, gxtop, gxbot);
-  }
-
-  for (int gy=0; gy<bounds.size.w; gy += GRID_SPACING) {
-    GPoint gxtop = (GPoint) { .y = gy, .x = 0 };
-    GPoint gxbot = (GPoint) { .y = gy, .x = bounds.size.w };
-    graphics_draw_line(ctx, gxtop, gxbot);
-  }
-
   
   graphics_context_set_stroke_color(ctx, gcolorh);
   graphics_context_set_stroke_width(ctx, HAND_WIDTH);
@@ -242,10 +246,12 @@ static void window_load(Window *window) {
     inverse = false;
   }
 
-  
+  bg_canvas_layer = layer_create(window_bounds);
   s_canvas_layer = layer_create(window_bounds);
+  layer_set_update_proc(bg_canvas_layer, bg_update_proc);
   layer_set_update_proc(s_canvas_layer, update_proc);
-  layer_add_child(window_layer, s_canvas_layer);
+  layer_add_child(window_layer, bg_canvas_layer);
+  layer_add_child(bg_canvas_layer, s_canvas_layer);
 }
 
 static void window_unload(Window *window) {
