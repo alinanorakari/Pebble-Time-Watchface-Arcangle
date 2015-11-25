@@ -32,7 +32,7 @@ static bool s_animating = false, debug = false, inverse = false;
 static GColor gcolorbg, gcolorh, gcolort;
 
 static void handle_colorchange() {
-  switch(colors) {
+  switch (colors) {
     case 1: // greens
       gcolorh = GColorMediumSpringGreen;
       gcolort = GColorMidnightGreen;
@@ -60,7 +60,7 @@ static void handle_colorchange() {
     GColor tempcolor = gcolorh;
     gcolorh = gcolort;
     gcolort = tempcolor;
-    switch(colors) {
+    switch (colors) {
       case 1: // greens
         gcolorh = GColorDarkGreen;
         gcolort = GColorMediumAquamarine;
@@ -96,7 +96,7 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
     colors = colors_t->value->uint8;
     persist_write_int(KEY_COLORS, colors);
   }
-  if(inverse_t && inverse_t->value->int32 > 0) {
+  if(inverse_t && inverse_t->value->int8 > 0) {
     persist_write_bool(KEY_INVERSE, true);
     inverse = true;
   } else {
@@ -140,7 +140,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   // Store time
   // dummy time in emulator
   if (debug) {
-    s_last_time.hours = 5;
+    s_last_time.hours = 11;
     s_last_time.minutes = tick_time->tm_sec;
   } else {
     s_last_time.hours = tick_time->tm_hour;

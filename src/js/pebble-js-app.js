@@ -14,7 +14,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
     if (configData.colors) {
         Pebble.sendAppMessage({
             colors: configData.colors,
-            inverse: configData.inverse === true
+            inverse: 0+(configData.inverse === true)
         }, function() {
             console.log('Send successful!');
         }, function() {
